@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>ריקו חמוצים</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@700;900&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; touch-action:none; image-rendering:pixelated; }
+
+body {
+  background:#2a0000;
+  display:flex; align-items:center; justify-content:center;
+  min-height:100vh; overflow:hidden; user-select:none;
+  font-family: 'Heebo', 'Courier New', monospace;
+}
+
+#gc {
+  position:relative;
+  width:min(100vw, calc(100vh * 0.6));
+  height:min(100vh, calc(100vw / 0.6));
+  max-width:420px; max-height:700px;
+  overflow:hidden;
+}
+
+canvas { display:block; width:100%; height:100%; }
+
+.screen {
+  position:absolute; inset:0;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  padding:24px; text-align:center;
+  pointer-events:all;
+}
+
+#ss {
+  background: linear-gradient(180deg, #1a0000 0%, #3a0000 100%);
+}
+#gs { background:rgba(20,0,0,.97); display:none; }
+
+.pixel-title {
+  font-size:40px; font-weight:900; letter-spacing:2px;
+  color:#ff3333;
+  text-shadow: 3px 3px 0 #7a0000, 6px 6px 0 #300;
+  margin-bottom:4px;
+  line-height:1.1;
+}
+.pixel-sub {
+  font-size:13px; letter-spacing:4px; color:#ffffff;
+  text-shadow: 2px 2px 0 #660000;
+  margin-bottom:28px;
+}
+
+.instr-box {
+  border:3px solid #ff3333;
+  box-shadow: 4px 4px 0 #7a0000;
+  background:#1a0000;
+  padding:14px 20px; margin-bottom:24px;
+  max-width:280px;
+}
+.instr-box p {
+  color:#ffffff; font-size:12px; line-height:2;
+  letter-spacing:1px;
+}
+
+.pixel-btn {
+  background:#cc0000; color:#fff; border:none;
+  padding:14px 40px; font-size:16px; font-weight:900;
+  font-family:'Courier New',monospace;
+  letter-spacing:3px; cursor:pointer;
+  border-bottom:4px solid #7a0000;
+  border-right:4px solid #7a0000;
+  transition:all .1s;
+  text-transform:uppercase;
+}
+.pixel-btn:active { transform:translate(2px,2px); border-bottom:2px solid #7a0000; border-right:2px solid #7a0000; }
+
+#hud {
+  position:absolute; top:0; left:0; right:0;
+  display:none;
+  background:#1a0000;
+  border-bottom:3px solid #cc0000;
+  padding:6px 12px;
+  align-items:center; justify-content:space-between;
+}
+.hud-item { color:#ffffff; font-size:13px; letter-spacing:1px; }
+.hud-item span { color:#ff8888; }
+
+.fs { font-size:72px; font-weight:900; color:#ff3333; line-height:1;
+  text-shadow:4px 4px 0 #7a0000; margin:8px 0; }
+.fl { font-size:12px; letter-spacing:3px; color:#888; margin-bottom:4px; }
+.ft { font-size:20px; font-weight:900; color:#ffffff; text-shadow:2px 2px 0 #880000; margin:12px 0 6px; letter-spacing:1px; }
+.fm { font-size:12px; color:#aaa; margin-bottom:24px; line-height:1.8; letter-spacing:1px; }
+.badge { font-size:10px; color:rgba(255,255,255,.35); letter-spacing:3px; margin-top:14px; }
+
+/* scanline effect */
+#gc::after {
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background: repeating-linear-gradient(0deg, rgba(255,255,255,.03) 0px, rgba(0,0,0,.08) 1px, transparent 1px, transparent 3px);
+}
+</style>
+</head>
+<body>
+<div id="gc">
+  <canvas id="c"></canvas>
+
+  <div id="hud">
+    <div class="hud-item">⚽ <span id="sc">00</span></div>
+    <div class="hud-item">❤️ <span id="lv">♥♥♥</span></div>
+    <div class="hud-item">⏱ <span id="tm">60</span></div>
+  </div>
+
+  <div class="screen" id="ss">
+    <div class="pixel-title">ריקו<br>חמוצים</div>
+    <div class="pixel-sub">⚽ הפועל לנצח ⚽</div>
+    <div class="instr-box"><p>
+      ► לחץ ליד ריקו → בועט!<br>
+      ► לחץ רחוק → ריקו רץ<br>
+      ► שוטרים חוסמים את השער<br>
+      ► שוטר סוס = מהיר וגדול 🐴<br>
+      ► כל גול = עוד שוטרים 😤
+    </p></div>
+    <button class="pixel-btn" onclick="startGame()">התחל משחק</button>
+    <div class="badge">לחץ התחל · הכנס חמוץ</div>
+  </div>
+
+  <div class="screen" id="gs">
+    <div class="fl">נגמר המשחק</div>
+    <div class="fs" id="fsc">0</div>
+    <div class="fl">שערים הובקעו</div>
+    <div class="ft" id="ftl"></div>
+    <div class="fm" id="fmg"></div>
+    <button class="pixel-btn" onclick="startGame()">שוב!</button>
+    <div class="badge">HAPOEL · KIBBUTZ · CHAMUTZIM</div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  RIKO CHAMUTZIM – PIXEL ART ENGINE
+// ═══════════════════════════════════════════════════
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+const HUD_H = 34; // height of HUD bar
+
+function resize() {
+  const g = document.getElementById('gc');
+  canvas.width  = g.clientWidth;
+  canvas.height = g.clientHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ── palette ──────────────────────────────────────
+const P = {
+  bg:       '#150000',
+  bgLight:  '#1e0000',
+  grass1:   '#1a2e1a',
+  grass2:   '#162814',
+  line:     'rgba(255,255,255,0.15)',
+  red:      '#cc0000',
+  redDark:  '#8a0000',
+  white:    '#f0f0f0',
+  yellow:   '#ffcc00',
+  black:    '#0a0a0a',
+  skin:     '#e8b887',
+  hair:     '#5a3010',
+  blue:     '#1a1a99',
+  blueDark: '#0a0a66',
+  brown:    '#8B5E3C',
+  brownDk:  '#5a3a1a',
+  pickle:   '#4a8a20',
+  pickleD:  '#2a5a08',
+  pickleL:  '#6aaa40',
+  goalPost: '#e0e0e0',
+  netLine:  'rgba(255,255,255,0.15)',
+  shadow:   'rgba(0,0,0,0.4)',
+  orange:   '#ff8800',
+};
+
+// ── pixel drawing helpers ─────────────────────────
+function px(x,y,w,h,c) {
+  ctx.fillStyle=c;
+  ctx.fillRect(Math.round(x),Math.round(y),w,h);
+}
+
+function circle(x,y,r,c) {
+  ctx.fillStyle=c;
+  ctx.beginPath(); ctx.arc(Math.round(x),Math.round(y),r,0,Math.PI*2); ctx.fill();
+}
+
+// ── state ─────────────────────────────────────────
+let gstate = 'start';
+let score, lives, timeLeft;
+let timerID=null, rafID=null;
+let player, goal, pickle, cops, particles;
+let tapX=null, tapY=null;
+let tapTime=0; // when tap was registered (for kick pulse visual)
+
+const SPEED   = 4;
+const PSIZE   = 14; // player pixel half-size
+
+// ── game init ─────────────────────────────────────
+function initGame() {
+  const W=canvas.width, H=canvas.height;
+  score=0; lives=3; timeLeft=60;
+  pickle=null; cops=[]; particles=[];
+  tapX=null; tapY=null;
+
+  player = {
+    x:W/2, y:H-80,
+    hasBall:true,
+    cooldown:0,
+    step:0,
+    dir:1   // 1=right, -1=left (for sprite flip)
+  };
+
+  goal = {
+    x:W/2-50, y:HUD_H+8,
+    w:100, h:38,
+    flash:0, flashCol:P.yellow
+  };
+
+  addCops(2);
+  updateHUD();
+}
+
+function addCops(n) {
+  const W=canvas.width, H=canvas.height;
+  for (let i=0; i<n; i++) {
+    const isHorse = cops.length >= 2 && Math.random() < 0.4;
+    const baseSpd = isHorse ? 3.2 : 1.8;
+    cops.push({
+      x: 40 + Math.random()*(W-80),
+      y: HUD_H+80 + Math.random()*(H-HUD_H-200),
+      vx: (Math.random()<.5?1:-1) * baseSpd * (.8+Math.random()*.4),
+      vy: (Math.random()<.5?1:-1) * baseSpd * (.5+Math.random()*.4),
+      horse: isHorse,
+      hit:0,
+      step:0
+    });
+  }
+}
+
+function updateHUD() {
+  document.getElementById('sc').textContent = String(score).padStart(2,'0');
+  document.getElementById('lv').textContent = '♥'.repeat(lives) + '♡'.repeat(Math.max(0,3-lives));
+  document.getElementById('tm').textContent = timeLeft;
+}
+
+// ── start / end ───────────────────────────────────
+function startGame() {
+  document.getElementById('ss').style.display='none';
+  document.getElementById('gs').style.display='none';
+  document.getElementById('hud').style.display='flex';
+  gstate='playing';
+  initGame();
+  clearInterval(timerID);
+  timerID=setInterval(()=>{
+    if(gstate!=='playing')return;
+    timeLeft--;updateHUD();
+    if(timeLeft<=0)endGame();
+  },1000);
+  cancelAnimationFrame(rafID);
+  loop();
+}
+
+function endGame() {
+  gstate='gameover';
+  clearInterval(timerID);
+  document.getElementById('hud').style.display='none';
+  document.getElementById('fsc').textContent=score;
+  let t,m;
+  if(score>=15)      {t='אגדה! ריקו★';     m='גוגי קוגן פחות ממך\nהפועל מאוד גאה! 🔴⚪';}
+  else if(score>=10) {t='ריקו ביג!';          m='שחקן עולם ממש\nאיפה הצנצנת?';}
+  else if(score>=5)  {t='לא רע, ריקו';        m='תאכל עוד חמוצים\nלאנרגיה! 💪';}
+  else               {t='אוי ריקו...';        m='הסוסים ניצחו הפעם\nנסה שוב!';}
+  document.getElementById('ftl').textContent=t;
+  document.getElementById('fmg').textContent=m;
+  document.getElementById('gs').style.display='flex';
+}
+
+// ── input ─────────────────────────────────────────
+function getPos(e) {
+  const r=canvas.getBoundingClientRect();
+  return {
+    x:(e.clientX-r.left)*canvas.width/r.width,
+    y:(e.clientY-r.top)*canvas.height/r.height
+  };
+}
+function onTap(p) {
+  if(gstate!=='playing')return;
+  tapX=p.x; tapY=p.y; tapTime=Date.now();
+}
+canvas.addEventListener('mousedown', e=>onTap(getPos(e)));
+canvas.addEventListener('mousemove', e=>{ if(e.buttons&&gstate==='playing') onTap(getPos(e)); });
+canvas.addEventListener('touchstart',e=>{ e.preventDefault(); onTap(getPos(e.touches[0])); },{passive:false});
+canvas.addEventListener('touchmove', e=>{ e.preventDefault(); onTap(getPos(e.touches[0])); },{passive:false});
+
+// ── loop ──────────────────────────────────────────
+function loop() {
+  if(gstate!=='playing')return;
+  update(); draw();
+  rafID=requestAnimationFrame(loop);
+}
+
+function dist(ax,ay,bx,by){ return Math.hypot(ax-bx,ay-by); }
+
+// ── update ────────────────────────────────────────
+function update() {
+  const W=canvas.width, H=canvas.height;
+
+  // player movement
+  if(tapX!==null) {
+    const dx=tapX-player.x, dy=tapY-player.y;
+    const d=Math.hypot(dx,dy);
+
+    if(d>6) {
+      player.x += (dx/d)*SPEED;
+      player.y += (dy/d)*SPEED;
+      player.step += 0.35;
+      player.dir = dx>0?1:-1;
+    }
+
+    player.x=Math.max(PSIZE,Math.min(W-PSIZE,player.x));
+    player.y=Math.max(HUD_H+PSIZE,Math.min(H-PSIZE,player.y));
+
+    // kick = tap near player
+    if(player.hasBall && player.cooldown===0 && d<52) {
+      doKick();
+      tapX=null; tapY=null;
+    }
+  }
+
+  if(player.cooldown>0) player.cooldown--;
+
+  // pickle update
+  if(pickle) {
+    pickle.x += pickle.vx;
+    pickle.y += pickle.vy;
+    pickle.rot += 0.08;
+    pickle.trail.push({x:pickle.x,y:pickle.y});
+    if(pickle.trail.length>8) pickle.trail.shift();
+
+    // wall
+    if(pickle.x<10)     { pickle.x=10;   pickle.vx*=-.65; }
+    if(pickle.x>W-10)   { pickle.x=W-10; pickle.vx*=-.65; }
+    if(pickle.y<HUD_H)  { pickle.y=HUD_H; pickle.vy*=-.5; }
+
+    // GOAL CHECK
+    if(pickle.x>goal.x && pickle.x<goal.x+goal.w &&
+       pickle.y>goal.y && pickle.y<goal.y+goal.h) {
+      score++;
+      goal.flash=50;
+      burst(pickle.x,pickle.y,P.yellow,20);
+      burst(pickle.x,pickle.y,P.red,15);
+      burst(pickle.x,pickle.y,P.white,10);
+      pickle=null;
+      resetPlayer();
+      addCops(1+(score%4===0?1:0));
+      updateHUD();
+      return;
+    }
+
+    // cop blocks pickle
+    for(const c of cops) {
+      const cr = c.horse?36:20;
+      if(dist(pickle.x,pickle.y,c.x,c.y)<cr) {
+        // pickle bounces off cop (doesn't score, cop blocks)
+        const ang = Math.atan2(pickle.y-c.y, pickle.x-c.x);
+        pickle.vx = Math.cos(ang)*Math.abs(pickle.vx+pickle.vy)*.8;
+        pickle.vy = Math.sin(ang)*Math.abs(pickle.vx+pickle.vy)*.8;
+        c.hit=18;
+        burst(pickle.x,pickle.y,'#4488ff',8);
+        break;
+      }
+    }
+
+    // missed
+    if(pickle.y>H+20) {
+      pickle=null;
+      player.hasBall=true;
+    }
+  }
+
+  // player touches cop = lose life (אבל לא כשמחזיק חמוץ!)
+  if(player.cooldown < 40 && !player.hasBall) {
+    for(const c of cops) {
+      const cr=c.horse?40:26;
+      if(dist(player.x,player.y,c.x,c.y)<cr) {
+        lives--;
+        burst(player.x,player.y,'#4488ff',12);
+        c.hit=30;
+        resetPlayer();
+        player.cooldown=80;
+        updateHUD();
+        if(lives<=0){endGame();return;}
+        break;
+      }
+    }
+  }
+
+  // כשמחזיק חמוץ – הילה הגנה
+  if(player.hasBall) {
+    for(const c of cops) {
+      const cr=c.horse?44:30;
+      if(dist(player.x,player.y,c.x,c.y)<cr) {
+        // דחוף שוטר הצידה
+        const ang = Math.atan2(c.y-player.y, c.x-player.x);
+        c.x += Math.cos(ang)*8;
+        c.y += Math.sin(ang)*8;
+        c.hit=15;
+        burst(player.x,player.y,'#ffdd00',6);
+      }
+    }
+  }
+
+  // move cops
+  for(const c of cops) {
+    c.x+=c.vx; c.y+=c.vy;
+    c.step+=0.15*(c.horse?1.5:1);
+    if(c.x<20||c.x>W-20) c.vx*=-1;
+    if(c.y<HUD_H+30||c.y>H-30) c.vy*=-1;
+    if(c.hit>0) c.hit--;
+  }
+
+  if(goal.flash>0) goal.flash--;
+
+  // particles
+  for(let i=particles.length-1;i>=0;i--) {
+    const p=particles[i];
+    p.x+=p.vx; p.y+=p.vy; p.vy+=.15; p.life--;
+    if(p.life<=0) particles.splice(i,1);
+  }
+}
+
+function doKick() {
+  const gx=goal.x+goal.w/2, gy=goal.y+goal.h/2;
+  const ang=Math.atan2(gy-player.y, gx-player.x);
+  // add slight random spread
+  const spread=(Math.random()-.5)*.3;
+  const spd=16+Math.random()*2;
+  pickle={
+    x:player.x, y:player.y-10,
+    vx:Math.cos(ang+spread)*spd,
+    vy:Math.sin(ang+spread)*spd,
+    rot:0, trail:[]
+  };
+  player.hasBall=false;
+  player.cooldown=50;
+  burst(player.x,player.y-10,P.yellow,6);
+}
+
+function resetPlayer() {
+  const W=canvas.width, H=canvas.height;
+  player.x=W/2; player.y=H-80;
+  player.hasBall=true; player.cooldown=20;
+  tapX=null; tapY=null;
+}
+
+function burst(x,y,col,n) {
+  for(let i=0;i<n;i++)
+    particles.push({
+      x,y,
+      vx:(Math.random()-.5)*10,
+      vy:(Math.random()-.5)*10-1,
+      life:20+Math.random()*20, maxLife:40,
+      col, r:2+Math.random()*3
+    });
+}
+
+// ── DRAW ──────────────────────────────────────────
+function draw() {
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  drawField(W,H);
+  drawGoal();
+  drawTapIndicator();
+
+  // pickle trail
+  if(pickle) {
+    for(let i=0;i<pickle.trail.length;i++) {
+      const a=(i/pickle.trail.length)*.5;
+      circle(pickle.trail[i].x,pickle.trail[i].y,3*(i/pickle.trail.length),`rgba(100,200,50,${a})`);
+    }
+    drawPickleSprite(pickle.x,pickle.y,pickle.rot);
+  }
+
+  for(const c of cops) drawCopSprite(c);
+  drawPlayerSprite(player);
+  drawParticles();
+
+  // low time flash
+  if(timeLeft<=10 && Math.floor(Date.now()/300)%2===0) {
+    ctx.save(); ctx.globalAlpha=.15;
+    ctx.fillStyle=P.red; ctx.fillRect(0,0,W,H);
+    ctx.restore();
+  }
+}
+
+// ── FIELD ─────────────────────────────────────────
+function drawField(W,H) {
+  // alternating stripe field
+  for(let row=0; row<10; row++) {
+    const y = HUD_H + row*(H-HUD_H)/10;
+    const h = (H-HUD_H)/10;
+    ctx.fillStyle = row%2===0?'#1a2e1a':'#162814';
+    ctx.fillRect(0,y,W,h);
+  }
+
+  // grid lines
+  ctx.save();
+  ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1;
+  ctx.setLineDash([4,8]);
+  // center line
+  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+  // center circle
+  ctx.beginPath(); ctx.arc(W/2,H/2,50,0,Math.PI*2); ctx.stroke();
+  // penalty area
+  ctx.setLineDash([]);
+  ctx.strokeRect(W/2-60,HUD_H,120,55);  // top box
+  ctx.strokeRect(W/2-60,H-55,120,55);   // bottom box
+  ctx.restore();
+
+  // white corner/center markings
+  ctx.save();
+  ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=2; ctx.setLineDash([]);
+  // center spot
+  circle(W/2, H/2, 4, 'rgba(255,255,255,0.3)');
+  ctx.restore();
+}
+
+// ── GOAL ──────────────────────────────────────────
+function drawGoal() {
+  const g=goal, fl=g.flash>0;
+  const t=Date.now()/1000;
+
+  // net
+  ctx.save();
+  ctx.fillStyle=fl?`rgba(255,220,0,${.3+Math.sin(t*20)*.15})`:'rgba(255,255,255,0.05)';
+  ctx.fillRect(g.x,g.y,g.w,g.h);
+
+  // net grid lines
+  ctx.strokeStyle=fl?'rgba(255,255,255,.5)':P.netLine;
+  ctx.lineWidth=1; ctx.setLineDash([]);
+  for(let x=g.x;x<=g.x+g.w;x+=10){ctx.beginPath();ctx.moveTo(x,g.y);ctx.lineTo(x,g.y+g.h);ctx.stroke();}
+  for(let y=g.y;y<=g.y+g.h;y+=8){ctx.beginPath();ctx.moveTo(g.x,y);ctx.lineTo(g.x+g.w,y);ctx.stroke();}
+
+  // posts – pixel chunky style
+  ctx.fillStyle=fl?P.yellow:P.goalPost;
+  ctx.fillRect(g.x-3,  g.y-2, 6,  g.h+4);   // left post
+  ctx.fillRect(g.x+g.w-3,g.y-2,6, g.h+4);  // right post
+  ctx.fillRect(g.x-3,  g.y-2, g.w+6, 6);    // crossbar
+
+  // post shadows
+  ctx.fillStyle='rgba(0,0,0,.35)';
+  ctx.fillRect(g.x+2,g.y+4,3,g.h);
+  ctx.fillRect(g.x+g.w+2,g.y+4,3,g.h);
+
+  if(fl) {
+    ctx.font='bold 18px "Courier New"';
+    ctx.fillStyle=P.yellow;
+    ctx.textAlign='center';
+    ctx.shadowColor=P.yellow; ctx.shadowBlur=12;
+    ctx.fillText('גוול!! 🎉',g.x+g.w/2,g.y-12);
+    ctx.shadowBlur=0;
+  } else {
+    ctx.font='10px "Courier New"';
+    ctx.fillStyle='rgba(255,255,255,.3)';
+    ctx.textAlign='center';
+    ctx.fillText('▲ שער ▲',g.x+g.w/2,g.y-6);
+  }
+  ctx.restore();
+}
+
+// ── TAP INDICATOR ─────────────────────────────────
+function drawTapIndicator() {
+  if(tapX===null||!player.hasBall) return;
+  const d=dist(tapX,tapY,player.x,player.y);
+  const isKick=d<52;
+  const age=(Date.now()-tapTime)/400;
+
+  ctx.save();
+  if(isKick) {
+    // kick indicator: expanding ring
+    ctx.strokeStyle=`rgba(255,200,0,${Math.max(0,.8-age)})`;
+    ctx.lineWidth=2;
+    ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.arc(player.x,player.y,20+age*30,0,Math.PI*2); ctx.stroke();
+    // arrow to goal
+    const gx=goal.x+goal.w/2, gy=goal.y+goal.h/2;
+    ctx.strokeStyle='rgba(255,200,0,.4)';
+    ctx.lineWidth=1.5; ctx.setLineDash([5,5]);
+    ctx.beginPath(); ctx.moveTo(player.x,player.y); ctx.lineTo(gx,gy); ctx.stroke();
+    // arrowhead
+    ctx.fillStyle='rgba(255,200,0,.4)';
+    ctx.beginPath(); ctx.arc(gx,gy,4,0,Math.PI*2); ctx.fill();
+  } else {
+    // move indicator: crosshair
+    ctx.strokeStyle='rgba(255,255,255,.35)';
+    ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    const s=8;
+    ctx.beginPath();
+    ctx.moveTo(tapX-s,tapY); ctx.lineTo(tapX+s,tapY);
+    ctx.moveTo(tapX,tapY-s); ctx.lineTo(tapX,tapY+s);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(tapX,tapY,5,0,Math.PI*2); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ── PICKLE SPRITE ────────────────────────────────
+function drawPickleSprite(x, y, rot) {
+  ctx.save();
+  ctx.translate(Math.round(x), Math.round(y));
+  ctx.rotate(rot);
+
+  // גוף – אליפסה ירוקה
+  ctx.fillStyle = '#1a3d08';
+  ctx.beginPath(); ctx.ellipse(0, 0, 14, 7, 0, 0, Math.PI*2); ctx.fill();
+
+  ctx.fillStyle = '#3a8818';
+  ctx.beginPath(); ctx.ellipse(0, 0, 12, 5.5, 0, 0, Math.PI*2); ctx.fill();
+
+  ctx.fillStyle = '#5aaa20';
+  ctx.beginPath(); ctx.ellipse(-1, -1, 9, 4, 0, 0, Math.PI*2); ctx.fill();
+
+  // הייליט
+  ctx.fillStyle = 'rgba(160,255,80,0.4)';
+  ctx.beginPath(); ctx.ellipse(-4, -2, 4, 2, 0, 0, Math.PI*2); ctx.fill();
+
+  // כתמים בהירים
+  ctx.fillStyle = '#88dd22';
+  for (const [cx,cy] of [[-7,0],[-3,-3],[2,-2],[6,1],[0,3],[-4,2]]) {
+    ctx.beginPath(); ctx.arc(cx, cy, 1.8, 0, Math.PI*2); ctx.fill();
+  }
+
+  // קצה שמאל
+  ctx.fillStyle = '#1a3d08';
+  ctx.beginPath(); ctx.ellipse(-13, 0, 3, 5.5, 0, 0, Math.PI*2); ctx.fill();
+
+  // פטוטרת ימין
+  ctx.fillStyle = '#1a3d08';
+  ctx.fillRect(12, -3, 5, 6);
+  ctx.fillStyle = '#4a9010';
+  ctx.fillRect(13, -2, 3, 4);
+
+  ctx.restore();
+}
+
+// ── COP SPRITE ────────────────────────────────────
+function drawCopSprite(c) {
+  ctx.save();
+  ctx.translate(Math.round(c.x),Math.round(c.y));
+  if(c.hit>0) {
+    // flash red when hit
+    ctx.globalAlpha=.4+Math.sin(c.hit*.8)*.4;
+  }
+  // flip based on movement direction
+  if(c.vx<0) ctx.scale(-1,1);
+
+  if(c.horse) drawHorseCop(c.step);
+  else        drawFootCop(c.step);
+
+  ctx.restore();
+}
+
+function drawFootCop(step) {
+  const s=Math.sin(step);
+  // shadow
+  ctx.fillStyle=P.shadow; ctx.beginPath(); ctx.ellipse(0,22,14,5,0,0,Math.PI*2); ctx.fill();
+
+  // legs (walking animation)
+  ctx.fillStyle='#111';
+  px(-8+s*4,8,7,16,P.blue);
+  px(1-s*4,8,7,16,P.blue);
+  // boots
+  px(-9+s*4,22,9,5,'#111');
+  px(0-s*4,22,9,5,'#111');
+
+  // body
+  px(-12,-2,24,20,P.blue);
+  // badge
+  px(-2,2,4,6,P.yellow);
+
+  // head
+  circle(0,-14,11,P.skin);
+  // hat
+  px(-12,-28,24,14,P.blueDark);
+  px(-14,-16,28,4,P.blueDark);
+  // hat badge
+  circle(0,-24,3,P.yellow);
+  // eyes
+  circle(-4,-14,2,'#000');
+  circle(4,-14,2,'#000');
+  // mouth (stern)
+  px(-4,-8,8,2,'#000');
+
+  // arms (swing)
+  px(-18+s*3,-2,7,16,P.blue);
+  px(11-s*3,-2,7,16,P.blue);
+
+  // label
+  ctx.font='bold 7px "Courier New"';
+  ctx.fillStyle=P.yellow; ctx.textAlign='center';
+  ctx.fillText('שוטר',0,30);
+}
+
+function drawHorseCop(step) {
+  const s = Math.sin(step);
+  const S = 3;
+
+  // צל
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath(); ctx.ellipse(0, 32, 28, 6, 0, 0, Math.PI*2); ctx.fill();
+
+  // ── גוף סוס ── pixel grid style
+  // גוף ראשי
+  ctx.fillStyle = '#7a4e2a';
+  ctx.fillRect(-28, -8, 50, 20);
+  ctx.fillStyle = '#8f6035';
+  ctx.fillRect(-26, -10, 48, 20);
+
+  // ראש + צוואר
+  ctx.fillStyle = '#7a4e2a';
+  ctx.fillRect(20, -22, 18, 16);   // צוואר
+  ctx.fillRect(30, -30, 20, 18);   // ראש
+  ctx.fillStyle = '#8f6035';
+  ctx.fillRect(32, -28, 16, 14);
+
+  // אוזן
+  ctx.fillStyle = '#7a4e2a';
+  ctx.fillRect(32, -34, 5, 8);
+  ctx.fillRect(40, -34, 5, 8);
+
+  // עין
+  ctx.fillStyle = '#1a0a00';
+  ctx.fillRect(44, -24, 4, 4);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(45, -24, 2, 2);
+
+  // נחיר
+  ctx.fillStyle = '#5a2a10';
+  ctx.fillRect(46, -16, 5, 4);
+
+  // רעמה
+  ctx.fillStyle = '#3a2010';
+  ctx.fillRect(22, -28, 8, 22);
+  ctx.fillRect(28, -24, 6, 18);
+
+  // רגליים – אנימציה
+  const legs = [
+    [-20, s*6],   // אחורי שמאל
+    [-8,  -s*6],  // אחורי ימין
+    [8,   -s*6],  // קדמי שמאל
+    [20,  s*6],   // קדמי ימין
+  ];
+  for (const [lx, angle] of legs) {
+    ctx.save();
+    ctx.translate(lx, 10);
+    ctx.rotate(angle * Math.PI/180);
+    ctx.fillStyle = '#6a3e1a';
+    ctx.fillRect(-4, 0, 8, 22);
+    // פרסה
+    ctx.fillStyle = '#2a1808';
+    ctx.fillRect(-5, 20, 10, 6);
+    ctx.restore();
+  }
+
+  // זנב
+  ctx.fillStyle = '#3a2010';
+  ctx.save();
+  ctx.translate(-28, 0);
+  ctx.rotate(s * 0.2);
+  ctx.fillRect(-4, -4, 6, 20);
+  ctx.fillRect(-6, 12, 5, 12);
+  ctx.restore();
+
+  // ── שוטר על הסוס ──
+  ctx.save();
+  ctx.translate(0, -30);
+
+  // רגלי שוטר (משני צדדי הסוס)
+  ctx.fillStyle = '#1a1a8a';
+  ctx.fillRect(-22, 8, 9, 14);
+  ctx.fillRect(13, 8, 9, 14);
+
+  // גוף
+  ctx.fillStyle = '#1a1a8a';
+  ctx.fillRect(-12, -6, 24, 20);
+  // תג
+  ctx.fillStyle = '#ffcc00';
+  ctx.fillRect(-2, -2, 5, 7);
+
+  // ראש
+  ctx.fillStyle = '#e8b887';
+  ctx.beginPath(); ctx.arc(0, -16, 11, 0, Math.PI*2); ctx.fill();
+
+  // כובע
+  ctx.fillStyle = '#0a0a66';
+  ctx.fillRect(-12, -30, 24, 14);
+  ctx.fillRect(-14, -18, 28, 4);
+  // תג כובע
+  ctx.fillStyle = '#ffcc00';
+  ctx.beginPath(); ctx.arc(0, -26, 3, 0, Math.PI*2); ctx.fill();
+
+  // עיניים
+  ctx.fillStyle = '#000';
+  ctx.fillRect(-5, -18, 3, 3);
+  ctx.fillRect(2, -18, 3, 3);
+
+  ctx.restore();
+
+  // תווית
+  ctx.font = 'bold 8px "Courier New"';
+  ctx.fillStyle = '#ffcc00';
+  ctx.textAlign = 'center';
+  ctx.fillText('🐴 שוטר סוס', 0, 44);
+}
+
+// ── PLAYER SPRITE// ── PLAYER SPRITE ─────────────────────────────────
+function drawPlayerSprite(pl) {
+  ctx.save();
+  ctx.translate(Math.round(pl.x), Math.round(pl.y));
+  if(pl.dir<0) ctx.scale(-1,1);
+
+  const s=Math.sin(pl.step);
+
+  // shadow
+  ctx.fillStyle=P.shadow;
+  ctx.beginPath(); ctx.ellipse(0,18,16,5,0,0,Math.PI*2); ctx.fill();
+
+  // legs
+  ctx.save(); ctx.translate(-7,6); ctx.rotate(s*.25);
+  px(-4,0,8,18,P.black);
+  px(-5,16,10,6,P.red); // boot
+  ctx.restore();
+
+  ctx.save(); ctx.translate(7,6); ctx.rotate(-s*.25);
+  px(-4,0,8,18,P.black);
+  px(-5,16,10,6,P.red);
+  ctx.restore();
+
+  // body – Hapoel Adidas kit
+  px(-14,-8,28,24,P.red);  // main body
+  // Adidas 3 stripes on right shoulder/arm (white)
+  // arms first (so stripes draw over them)
+  ctx.save(); ctx.translate(-18,-4); ctx.rotate(-s*.2);
+  px(0,0,8,18,P.red);
+  // 3 stripes on left arm
+  px(2,1,3,16,P.white);
+  px(6,1,3,16,P.white);
+  ctx.restore();
+  ctx.save(); ctx.translate(10,-4); ctx.rotate(s*.2);
+  px(0,0,8,18,P.red);
+  // 3 stripes on right arm
+  px(-1,1,3,16,P.white);
+  px(3,1,3,16,P.white);
+  ctx.restore();
+  // Adidas logo on chest (3 bars)
+  px(-6,2,4,3,P.white);
+  px(-6,7,6,3,P.white);
+  px(-6,12,8,3,P.white);
+  // kit number
+  ctx.font='bold 9px "Courier New"';
+  ctx.fillStyle=P.white; ctx.textAlign='center';
+  ctx.fillText('7',6,6);
+
+  // head
+  circle(0,-20,13,P.skin);
+
+  // hair (dark, thick pixel)
+  px(-13,-32,26,13,P.hair);
+  px(-13,-21,4,4,P.hair); // sideburn left
+  px(9,-21,4,4,P.hair);   // sideburn right
+
+  // eyes
+  circle(-4,-20,2.5,'#000');
+  circle(4,-20,2.5,'#000');
+  // pupils (white dot)
+  circle(-3,-21,1,P.white);
+  circle(5,-21,1,P.white);
+  // smile
+  // חיוך שמח – קשת כלפי מעלה
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, -17, 6, 0.2, Math.PI - 0.2);
+  ctx.stroke();
+
+  // pickle held in right hand
+  if(pl.hasBall) {
+    const bob=Math.sin(Date.now()/280)*2;
+    ctx.save();
+    // position at end of right arm
+    ctx.translate(10,-4);
+    ctx.rotate(s*.2);
+    ctx.translate(4, 18+bob); // end of arm
+    ctx.rotate(-0.4); // slight tilt
+    drawPickleSprite(0,0,Math.sin(Date.now()/600)*0.3);
+    ctx.restore();
+  }
+
+  // name tag
+  ctx.font='bold 9px "Courier New"';
+  ctx.fillStyle=P.yellow; ctx.textAlign='center';
+  ctx.fillText('ריקו',0,-42);
+
+  ctx.restore();
+}
+
+// ── PARTICLES ─────────────────────────────────────
+function drawParticles() {
+  for(const p of particles) {
+    ctx.save();
+    ctx.globalAlpha=p.life/p.maxLife;
+    // square particles for pixel feel
+    ctx.fillStyle=p.col;
+    ctx.fillRect(Math.round(p.x-p.r),Math.round(p.y-p.r),Math.round(p.r*2),Math.round(p.r*2));
+    ctx.restore();
+  }
+}
+
+resize();
+</script>
+</body>
+</html>
